@@ -90,7 +90,10 @@ const server=http.createServer(async(req,res)=>{
     if(req.method!=='POST')return send(res,405,{error:'POST required'},undefined,{allow:'POST'});
     if(!String(req.headers['content-type']||'').toLowerCase().startsWith('multipart/form-data'))return send(res,415,{error:'Use multipart/form-data'});
     let bytes=0;const chunks=[];
-    for await(const chunk of req){bytes+=chunk.length;if(bytes<=MAX_BODY)chunks.push(chunk);}
+    await new Promise((resolve,reject)=>{
+      req.on('data',chunk=>{bytes+=chunk.length;if(bytes<=MAX_BODY)chunks.push(chunk);});
+      req.on('end',resolve);req.on('error',reject);
+    });
     if(bytes>MAX_BODY)throw new InputError(413,'Upload exceeds 512 KiB');
     const result=analyse(multipart(Buffer.concat(chunks),req.headers['content-type']),bytes);
     console.info('manifest_request '+JSON.stringify({path,bytes,rows:result.rowCount,release:RELEASE}));
